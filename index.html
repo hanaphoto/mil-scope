@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ミルスコープ</title>
+<style>
+:root{--bg:#15171a;--pn:#1f2327;--ln:#343a40;--fg:#eceff1;--mu:#98a1a8;--ac:#ffb02e;color-scheme:dark;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0;background:var(--bg);color:var(--fg);font:14px/1.45 -apple-system,"Hiragino Sans","Noto Sans JP",sans-serif}
+body{display:flex;flex-direction:column}
+#tabs{display:flex;gap:6px;padding:8px}
+#tabs button{flex:1}
+button,select,input{font:inherit;color:var(--fg);background:var(--pn);border:1px solid var(--ln);border-radius:8px;padding:8px 10px;min-height:40px}
+button{cursor:pointer}
+button.on{background:var(--ac);color:#1a1200;border-color:var(--ac);font-weight:700}
+button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--ac);outline-offset:1px}
+#st{position:relative;flex:1;min-height:220px;background:#000;overflow:hidden}
+#st video,#st img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain}
+#st img{display:none}
+#cv{position:absolute;inset:0;width:100%;height:100%;touch-action:none}
+#msg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;padding:24px;color:var(--mu)}
+#pn{padding:10px 10px 12px;display:grid;gap:8px;background:var(--bg);max-height:46vh;overflow-y:auto}
+#rd{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap}
+#dist{font-size:38px;font-weight:700;color:var(--ac);font-variant-numeric:tabular-nums}
+#sub{color:var(--mu);font-variant-numeric:tabular-nums}
+.row{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.row label{color:var(--mu);font-size:12px}
+.row input{width:84px}
+.row select{flex:1;min-width:140px}
+small{color:var(--mu);font-size:12px}
+details{border:1px solid var(--ln);border-radius:8px;padding:6px 10px}
+summary{cursor:pointer;color:var(--mu)}
+</style></head><body>
+<div id="tabs" role="tablist">
+<button data-m="hunt" role="tab">猟</button><button data-m="comp" role="tab">競技</button><button data-m="photo" role="tab">撮影</button>
+</div>
+<div id="st">
+<video id="vd" playsinline muted autoplay></video><img id="im" alt="">
+<canvas id="cv"></canvas>
+<div id="msg">「カメラ」を押すと映像にレティクルが重なります。</div>
+</div>
+<div id="pn">
+<div id="rd"><span id="dist">--- m</span><span id="sub">--- mil</span></div>
+<div class="row"><select id="pre" aria-label="対象"></select>
+<label>実寸(m)<br><input id="sz" type="number" step="0.01" inputmode="decimal"></label>
+<label>ズーム倍率<br><input id="zm" type="number" step="0.1" min="0.5" value="1" inputmode="decimal"></label></div>
+<div class="row"><button id="bc">カメラ</button><button id="bf">静止</button><button id="bp">写真を選ぶ</button><button id="bk">色</button>
+<input id="fi" type="file" accept="image/*" hidden></div>
+<details><summary>校正（精度を上げる）</summary>
+<p><small>大きさと距離が分かっている物（例：10m先の1mの物差し）を映し、赤い2点をその両端に合わせてから押します。倍率ごとに値を保存します。</small></p>
+<div class="row"><label>既知の大きさ(m)<br><input id="ks" type="number" step="0.01" value="1" inputmode="decimal"></label>
+<label>既知の距離(m)<br><input id="kd" type="number" step="0.1" value="10" inputmode="decimal"></label>
+<button id="bcal">この2点で校正</button><button id="brs">初期値に戻す</button></div>
+<small id="cs"></small></details>
+<small>未校正の値は画角65°の仮定で、目安です。距離は安全確認の代わりにはなりません。</small>
+<small><a href="manual.html" style="color:#ffb02e">使い方（説明書）を開く</a></small>
+</div>
+<script>
+const $=i=>document.getElementById(i);
+const PRE={
+hunt:[['ニホンジカ 肩高',0.9],['イノシシ 肩高',0.7],['人（確認用）身長',1.7],['カスタム',0]],
+comp:[['IPSC標的 幅',0.45],['IPSC標的 高さ',0.75],['スチール 直径30cm',0.3],['クレー 直径',0.11],['カスタム',0]],
+photo:[['人 身長',1.7],['乗用車 全幅',1.8],['乗用車 全高',1.5],['サッカーゴール 幅',7.32],['カスタム',0]]};
+const COL=['#ffb02e','#ff4d4d','#ffffff','#4de0ff'];
+let mode='hunt',ci=0,still=false,base=null,A=null,B=null,drag=null,geo=null;
+const DEF=1/(2*Math.tan(65*Math.PI/360)*1000);
+try{const s=JSON.parse(localStorage.getItem('mil.s')||'{}');mode=s.mode||mode;ci=s.ci||0;base=s.base||null}catch(e){}
+function save(){try{localStorage.setItem('mil.s',JSON.stringify({mode,ci,base}))}catch(e){}}
+const zoom=()=>Math.max(.1,parseFloat($('zm').value)||1);
+const frac=()=>(base||DEF)*zoom();
+function setMode(m){mode=m;document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('on',b.dataset.m===m));
+const p=$('pre');p.innerHTML='';PRE[m].forEach((x,i)=>p.add(new Option(x[0],i)));pickPre();save()}
+function pickPre(){const v=PRE[mode][$('pre').value||0];if(v[1])$('sz').value=v[1]}
+document.querySelectorAll('#tabs button').forEach(b=>b.onclick=()=>setMode(b.dataset.m));
+$('pre').onchange=pickPre;
+$('bk').onclick=()=>{ci=(ci+1)%COL.length;save()};
+const vd=$('vd'),im=$('im'),msg=$('msg');
+$('bc').onclick=async()=>{
+ try{const s=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'},width:{ideal:3840}},audio:false});
+ vd.srcObject=s;still=false;im.style.display='none';vd.style.display='block';msg.style.display='none';A=null;$('bf').textContent='静止'}
+ catch(e){msg.style.display='flex';msg.textContent='カメラを使えませんでした。「写真を選ぶ」で撮影済みの写真でも測れます。'}};
+$('bf').onclick=()=>{if(still)return;if(vd.paused){vd.play();$('bf').textContent='静止'}else{vd.pause();$('bf').textContent='再開'}};
+$('bp').onclick=()=>$('fi').click();
+$('fi').onchange=e=>{const f=e.target.files[0];if(!f)return;im.src=URL.createObjectURL(f);im.style.display='block';vd.style.display='none';still=true;msg.style.display='none';A=null};
+const cv=$('cv'),st=$('st');
+function geom(){const W=st.clientWidth,H=st.clientHeight,el=still?im:vd;const vw=el.videoWidth||el.naturalWidth,vh=el.videoHeight||el.naturalHeight;
+ if(!vw){geo={W,H,dw:W};return false}const s=Math.min(W/vw,H/vh);geo={W,H,dw:vw*s};return true}
+function ptr(e){const r=cv.getBoundingClientRect();return{x:e.clientX-r.left,y:e.clientY-r.top}}
+cv.onpointerdown=e=>{if(!A)return;const p=ptr(e),dA=Math.hypot(p.x-A.x,p.y-A.y),dB=Math.hypot(p.x-B.x,p.y-B.y);
+ drag=dA<dB?A:B;if(Math.min(dA,dB)>60)drag=null;if(drag){cv.setPointerCapture(e.pointerId);drag.x=p.x;drag.y=p.y}};
+cv.onpointermove=e=>{if(drag){const p=ptr(e);drag.x=p.x;drag.y=p.y}};
+cv.onpointerup=()=>drag=null;
+$('bcal').onclick=()=>{if(!A||!geo)return;const ex=parseFloat($('ks').value)/parseFloat($('kd').value)*1000;
+ const gap=Math.hypot(A.x-B.x,A.y-B.y);if(!(ex>0)||gap<5)return;base=gap/geo.dw/ex/zoom();save();info()};
+$('brs').onclick=()=>{base=null;save();info()};
+function info(){$('cs').textContent=base?'校正済み：倍率1xで1ミル＝画面幅の'+(base*100).toFixed(4)+'%':'未校正（画角65°の仮定）'}
+function reticle(x,cx,cy,m,W,H,c){
+ x.strokeStyle=c;x.fillStyle=c;x.lineWidth=1.2;x.font='10px sans-serif';x.textAlign='center';
+ const nx=Math.floor(cx/m),ny=Math.floor(cy/m),step=m>=8?1:5,gap=mode==='hunt'?.6*m:0;
+ x.beginPath();x.moveTo(0,cy);x.lineTo(cx-gap,cy);x.moveTo(cx+gap,cy);x.lineTo(W,cy);x.moveTo(cx,0);x.lineTo(cx,cy-gap);x.moveTo(cx,cy+gap);x.lineTo(cx,H);x.stroke();
+ for(let k=step;k<=Math.max(nx,ny);k+=step){const lab=(k%(step===1?5:10)===0);
+  [[k,0],[-k,0],[0,k],[0,-k]].forEach(([a,b])=>{const px=cx+a*m,py=cy+b*m;if(px<0||py<0||px>W||py>H)return;
+   if(mode==='hunt'){x.beginPath();x.arc(px,py,lab?3:2.2,0,7);x.fill()}
+   else{const L=lab?9:5;x.beginPath();if(a)x.moveTo(px,py-L),x.lineTo(px,py+L);else x.moveTo(px-L,py),x.lineTo(px+L,py);x.stroke()}});
+  if(lab){x.fillText(k,cx+k*m,cy-12);x.fillText(k,cx+12,cy+k*m+3)}}
+ if(mode==='comp'&&m>=8){for(let r=1;r<=Math.min(ny-1,8);r++)for(let q=-5;q<=5;q++){if(!q&&mode)continue;const px=cx+q*m,py=cy+r*m;if(px>0&&px<W&&py<H){x.beginPath();x.arc(px,py,1.4,0,7);x.fill()}}}
+ if(mode==='hunt'){x.lineWidth=3;const e=Math.min(nx,ny)*m;[[1,0],[-1,0],[0,1],[0,-1]].forEach(([a,b])=>{x.beginPath();x.moveTo(cx+a*(e-22),cy+b*(e-22));x.lineTo(cx+a*e,cy+b*e);x.stroke()});x.lineWidth=1.2}}
+function frame(){
+ const c=COL[ci],d=devicePixelRatio||1,ok=geom(),W=geo.W,H=geo.H;
+ if(cv.width!==Math.round(W*d)||cv.height!==Math.round(H*d)){cv.width=Math.round(W*d);cv.height=Math.round(H*d)}
+ const x=cv.getContext('2d');x.setTransform(d,0,0,d,0,0);x.clearRect(0,0,W,H);
+ if(ok||vd.srcObject||still){const m=frac()*geo.dw,cx=W/2,cy=H/2;
+  if(!A){A={x:cx-3*m,y:cy+2*m};B={x:cx+3*m,y:cy+2*m}}
+  reticle(x,cx,cy,m,W,H,c);
+  const gap=Math.hypot(A.x-B.x,A.y-B.y),mil=gap/m,sz=parseFloat($('sz').value)||0;
+  x.strokeStyle='#ff3b30';x.fillStyle='#ff3b30';x.lineWidth=2;x.beginPath();x.moveTo(A.x,A.y);x.lineTo(B.x,B.y);x.stroke();
+  [A,B].forEach(p=>{x.beginPath();x.arc(p.x,p.y,9,0,7);x.stroke()});
+  if(mil>0.05&&sz>0){const D=sz*1000/mil;$('dist').textContent=(D<10?D.toFixed(1):Math.round(D))+' m';$('sub').textContent=mil.toFixed(2)+' mil ／ '+Math.round(D*1.0936)+' yd'}
+  else{$('dist').textContent='--- m';$('sub').textContent=mil.toFixed(2)+' mil'}}
+ requestAnimationFrame(frame)}
+setMode(mode);info();frame();
+</script></body></html>

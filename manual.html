@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ミルスコープ 使い方</title>
+<style>
+  body{font-family:-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif;line-height:1.8;color:#222;margin:0;padding:20px;background:#fafafa}
+  main{max-width:760px;margin:0 auto;background:#fff;padding:24px 20px 40px;border-radius:12px}
+  h1{font-size:1.5rem;border-bottom:3px solid #15171a;padding-bottom:8px}
+  h2{font-size:1.15rem;margin-top:2em;border-left:5px solid #ffb02e;padding-left:8px}
+  .warn{background:#fff7e6;border:1px solid #e6c87a;border-radius:8px;padding:10px 14px}
+  a.app{display:inline-block;background:#15171a;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;font-weight:bold}
+  table{border-collapse:collapse;width:100%}
+  th,td{border:1px solid #ccc;padding:6px 10px;text-align:left;vertical-align:top}
+  th{background:#f3f3f3}
+  small{color:#666}
+</style>
+</head>
+<body>
+<main>
+<h1>ミルスコープ 使い方</h1>
+<p>iPhoneのSafariで動く測距ツールです。カメラ映像や写真にミルレティクルを重ね、大きさが分かっている対象の両端に赤い2点を合わせると、その対象までの距離を表示します。</p>
+<p><a class="app" href="./">アプリを開く</a></p>
+
+<h2>動作環境</h2>
+<ul>
+<li>iPhoneのSafari（カメラを使う場合はカメラの許可が必要です。位置情報は使いません）</li>
+<li>実機での十分な検証はこれからです。表示される距離は目安であり、安全確認の代わりにはなりません</li>
+</ul>
+
+<h2>計算の仕組み</h2>
+<ul>
+<li>距離（m）＝ 対象の実寸（m）× 1000 ÷ 対象のミル数</li>
+<li>1ミルは、1km先で1mの大きさに見える角度です</li>
+<li>未校正のときは水平画角65°の仮定で計算します。校正すると精度が上がります（下の「校正」参照）</li>
+</ul>
+
+<h2>1. 映像を表示する</h2>
+<ul>
+<li>「カメラ」：背面カメラの映像にレティクルが重なります。許可を求められたら許可してください</li>
+<li>「静止」：カメラ映像をその場で止めます。もう一度押すと「再開」になります。止めた映像のまま測れます</li>
+<li>「写真を選ぶ」：撮影済みの写真を表示して測れます。カメラが使えない場合はこちらを使ってください</li>
+<li>「色」：レティクルの色を黄→赤→白→水色の順に切り替えます。背景で見やすい色を選んでください</li>
+</ul>
+
+<h2>2. 測る</h2>
+<ol>
+<li>上部のタブでモード（猟／競技／撮影）を選びます。レティクルの形と対象プリセットが切り替わります</li>
+<li>対象プリセットを選ぶと実寸（m）が自動で入ります。プリセットに無い対象は「カスタム」を選び、実寸を直接入力します</li>
+<li>ズームを使った場合は、ズーム倍率の欄にその倍率を入力します（カメラのズームとは自動で連動しません）</li>
+<li>赤い2点をドラッグして、対象の両端（プリセットで選んだ寸法の両端）に合わせます</li>
+<li>距離が大きく表示され、その横にミル数とヤード換算が出ます（10m未満は小数1位、それ以上は整数で表示）</li>
+</ol>
+
+<h2>モードとプリセット</h2>
+<table>
+<tr><th>モード</th><th>レティクル</th><th>プリセット（実寸）</th></tr>
+<tr><td>猟</td><td>中央を少し空けた十字線＋1ミルごとのドット＋外周の太いポスト</td><td>ニホンジカ 肩高0.9m／イノシシ 肩高0.7m／人（確認用）身長1.7m／カスタム</td></tr>
+<tr><td>競技</td><td>1ミル目盛り＋細目盛り＋ホールドオーバー用ドット格子</td><td>IPSC標的 幅0.45m・高さ0.75m／スチール 直径30cm／クレー 直径0.11m／カスタム</td></tr>
+<tr><td>撮影</td><td>細い目盛りと数字のみ</td><td>人 身長1.7m／乗用車 全幅1.8m・全高1.5m／サッカーゴール 幅7.32m／カスタム</td></tr>
+</table>
+
+<h2>3. 校正（精度を上げる）</h2>
+<ol>
+<li>大きさと距離が分かっている物（例：10m先の1mの物差し）を映します</li>
+<li>赤い2点をその両端に合わせます</li>
+<li>「校正（精度を上げる）」を開き、既知の大きさ（m）と既知の距離（m）を入力して「この2点で校正」を押します</li>
+<li>「校正済み」と表示されれば完了です。校正値は倍率1倍あたりの値として保存され、ズーム倍率と連動します</li>
+<li>元に戻すときは「初期値に戻す」を押します（画角65°の仮定に戻ります）</li>
+</ol>
+
+<h2>保存されるもの</h2>
+<ul>
+<li>モード・レティクルの色・校正値の3点だけが、この端末のブラウザ内（localStorage）に保存され、次回開いたときに復元されます</li>
+<li>実寸・ズーム倍率・選んだ写真は保存されません。カメラ映像や写真が外部へ送信されることもありません</li>
+</ul>
+
+<h2>注意点</h2>
+<div class="warn">
+<ul style="margin:0">
+<li>表示される距離は<strong>目安</strong>です。安全確認の代わりにはなりません</li>
+<li>精度は実寸の正しさに比例します。実寸が10%ずれると、距離も約10%ずれます</li>
+<li>2点は対象の両端に正確に合わせてください。遠い対象ほど、少しのずれが大きな誤差になります</li>
+<li>超広角や望遠など、標準と違うレンズでは未校正の誤差が大きくなります。使うレンズで校正してください</li>
+</ul>
+</div>
+
+<p><small>出典：Claudeチャット「iPhoneカメラでミル計算」で作成したArtifact「ミルスコープ」。公開時にアプリの操作パネル下部へこの説明書へのリンクを1行追加しています。</small></p>
+<p><a class="app" href="./">アプリを開く</a></p>
+</main>
+</body>
+</html>
